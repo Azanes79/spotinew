@@ -2,8 +2,10 @@ name: spotinew — sync playlist
 
 on:
   schedule:
-    # Tous les jours à 06:00 UTC (08:00 heure de Paris en été, 07:00 en hiver).
-    - cron: "0 6 * * *"
+    # Tous les jours à 00:00 UTC = 02:00 à Paris en été (CEST).
+    # GitHub Actions est en UTC : en hiver (CET), ça correspondra à 01:00 Paris.
+    # Pour viser 02:00 toute l'année en hiver, mettre plutôt "0 1 * * *".
+    - cron: "0 0 * * *"
   workflow_dispatch: {} # permet aussi de lancer manuellement depuis l'onglet Actions
 
 jobs:

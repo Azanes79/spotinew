@@ -34,7 +34,11 @@ SCOPES = "user-follow-read playlist-modify-private playlist-modify-public"
 
 
 def env(name, default=None, required=False):
-    val = os.environ.get(name, default)
+    # Une variable GitHub Actions non définie est transmise comme chaîne vide :
+    # on la traite donc comme absente et on retombe sur le défaut.
+    val = os.environ.get(name)
+    if val is None or val.strip() == "":
+        val = default
     if required and not val:
         sys.exit(f"[ERREUR] Variable d'environnement manquante : {name}")
     return val
@@ -131,19 +135,31 @@ def get_album_track_uris(sp, album_id):
     return tracks
 
 
-def get_playlist_track_ids(sp, playlist_id):
-    """Ensemble des IDs de pistes déjà présentes dans la playlist."""
+def get_playlist_state(sp, playlist_id):
+    """Renvoie (IDs des pistes présentes, date d'ajout la plus récente).
+
+    La date du dernier ajout sert de repère « dernier scan » : la prochaine
+    exécution repart de là, au lieu de tout rescanner depuis START_DATE.
+    Aucun fichier d'état à maintenir : tout vient de la playlist.
+    """
     ids = set()
+    latest_added = None  # chaîne ISO 8601, ex. "2026-06-12T01:23:45Z"
     results = sp.playlist_items(
-        playlist_id, fields="items(track(id)),next", limit=100, additional_types=("track",)
+        playlist_id,
+        fields="items(added_at,track(id)),next",
+        limit=100,
+        additional_types=("track",),
     )
     while results:
         for it in results.get("items", []):
             t = it.get("track")
             if t and t.get("id"):
                 ids.add(t["id"])
+            added = it.get("added_at")
+            if added and (latest_added is None or added > latest_added):
+                latest_added = added
         results = sp.next(results) if results.get("next") else None
-    return ids
+    return ids, latest_added
 
 
 def find_or_create_playlist(sp, me):
@@ -181,8 +197,7 @@ def chunked(seq, n):
 
 
 def main():
-    floor = date.fromisoformat(env("START_DATE", required=True))
-    print(f"[INFO] Date plancher : {floor.isoformat()}")
+    start_date = date.fromisoformat(env("START_DATE", required=True))
 
     sp = get_client()
     me = sp.me()
@@ -190,8 +205,20 @@ def main():
     playlist_id = find_or_create_playlist(sp, me)
     print(f"[INFO] Playlist cible : {playlist_id}")
 
-    existing = get_playlist_track_ids(sp, playlist_id)
+    existing, latest_added = get_playlist_state(sp, playlist_id)
     print(f"[INFO] {len(existing)} titre(s) déjà dans la playlist.")
+
+    # Fenêtre de scan : on repart de la date du dernier titre ajouté (dernier
+    # scan), sans jamais descendre sous START_DATE.
+    if latest_added:
+        last_scan = date.fromisoformat(latest_added[:10])
+        floor = max(start_date, last_scan)
+        print(f"[INFO] Dernier ajout : {last_scan.isoformat()} → "
+              f"scan depuis {floor.isoformat()}.")
+    else:
+        floor = start_date
+        print(f"[INFO] Playlist vide → scan complet depuis START_DATE "
+              f"({floor.isoformat()}).")
 
     artists = get_followed_artists(sp)
     print(f"[INFO] {len(artists)} artiste(s) suivi(s).")

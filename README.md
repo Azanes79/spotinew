@@ -12,10 +12,17 @@ Tourne tout seul dans le cloud via **GitHub Actions** (gratuit, même PC éteint
 À chaque exécution, le script :
 
 1. récupère la liste de tes **artistes suivis** ;
-2. liste leurs **albums / singles** parus depuis `START_DATE` ;
-3. récupère les **pistes** de ces sorties ;
-4. les **ajoute à la playlist** en évitant les doublons (il compare au contenu
-   actuel de la playlist — aucun fichier d'état à gérer).
+2. détermine la **fenêtre de scan** : il repart de la date du **dernier titre
+   ajouté** à la playlist (= dernier scan) ; au tout premier passage (playlist
+   vide), il part de `START_DATE` ;
+3. liste leurs **albums / singles** parus dans cette fenêtre ;
+4. récupère les **pistes** et les **ajoute à la playlist** en évitant les doublons
+   (comparaison au contenu actuel — **aucun fichier d'état à gérer**).
+
+> ⏱️ **Reprise incrémentale.** Le repère « dernier scan » est lu directement
+> depuis la playlist (date d'ajout la plus récente). Inutile de stocker un état
+> ou de donner des droits d'écriture Git à GitHub Actions ; les doublons restent
+> impossibles grâce à la comparaison avec la playlist.
 
 > 💡 Spotify propose déjà une playlist auto « Release Radar », mais limitée à
 > ~30 titres et non paramétrable. spotinew te donne le contrôle total
@@ -79,7 +86,7 @@ python src/sync.py
      - `START_DATE` → ex. `2026-01-01`
      - `SPOTIFY_PLAYLIST_NAME` → ex. `Nouveautés abonnements`
      - `SPOTIFY_PLAYLIST_ID` *(facultatif)* — pour cibler une playlist précise.
-3. C'est tout. Le workflow tourne **chaque jour à 06:00 UTC**.
+3. C'est tout. Le workflow tourne **chaque jour à 00:00 UTC (≈ 02:00 à Paris)**.
    Tu peux aussi le lancer à la main : onglet **Actions → spotinew → Run workflow**.
 
 ---
@@ -91,7 +98,7 @@ python src/sync.py
 | `SPOTIFY_CLIENT_ID`     | secret  | Client ID de l'app Spotify                                      |
 | `SPOTIFY_CLIENT_SECRET` | secret  | Client Secret de l'app Spotify                                  |
 | `SPOTIFY_REFRESH_TOKEN` | secret  | Jeton obtenu via `auth_setup.py`                                |
-| `START_DATE`            | var     | Date plancher (`AAAA-MM-JJ`) : sorties prises en compte à partir d'elle |
+| `START_DATE`            | var     | Date plancher absolue (`AAAA-MM-JJ`) : point de départ du 1er scan, jamais dépassée vers le bas |
 | `SPOTIFY_PLAYLIST_NAME` | var     | Nom de la playlist (créée si absente)                           |
 | `SPOTIFY_PLAYLIST_ID`   | var     | *(optionnel)* ID d'une playlist existante, prioritaire sur le nom |
 
