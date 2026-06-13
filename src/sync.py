@@ -20,6 +20,7 @@ playlist sans que le scan reparte de START_DATE.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sys
 import urllib.error
@@ -38,6 +39,8 @@ except ImportError:  # python-dotenv est optionnel (absent en CI, vars déjà in
 
 SCOPES = "user-follow-read playlist-read-private playlist-modify-private playlist-modify-public"
 
+log = logging.getLogger("spotinew")
+
 
 def env(name, default=None, required=False):
     # Une variable GitHub Actions non définie est transmise comme chaîne vide :
@@ -46,8 +49,23 @@ def env(name, default=None, required=False):
     if val is None or val.strip() == "":
         val = default
     if required and not val:
-        sys.exit(f"[ERREUR] Variable d'environnement manquante : {name}")
+        log.error("Variable d'environnement manquante : %s", name)
+        sys.exit(1)
     return val
+
+
+def setup_logging():
+    """Configure le logging : sortie horodatée sur stdout, niveau via LOG_LEVEL.
+
+    Le StreamHandler de logging flushe après chaque message : les logs
+    s'affichent donc en temps réel en CI, sans dépendre du buffering de stdout.
+    """
+    logging.basicConfig(
+        level=env("LOG_LEVEL", "INFO").upper(),
+        format="%(asctime)s %(levelname)-7s %(message)s",
+        datefmt="%H:%M:%S",
+        stream=sys.stdout,
+    )
 
 
 def state_path():
@@ -195,7 +213,7 @@ def find_or_create_playlist(sp, me):
         else:
             break
 
-    print(f"[INFO] Playlist « {name} » introuvable — création…")
+    log.info("Playlist « %s » introuvable — création…", name)
     pl = sp.user_playlist_create(
         user_id,
         name,
@@ -210,7 +228,7 @@ def chunked(seq, n):
         yield seq[i : i + n]
 
 
-def notify_discord(webhook_url, added, artists_count, floor, today, error=None):
+def notify_discord(webhook_url, added=0, artists_count=0, floor=None, today=None, error=None):
     """Envoie un résumé du sync sur un webhook Discord."""
     if not webhook_url:
         return
@@ -242,7 +260,7 @@ def notify_discord(webhook_url, added, artists_count, floor, today, error=None):
     try:
         urllib.request.urlopen(req, timeout=10)
     except urllib.error.URLError as exc:
-        print(f"[WARN] Impossible d'envoyer la notification Discord : {exc}")
+        log.warning("Impossible d'envoyer la notification Discord : %s", exc)
 
 
 def main():
@@ -250,16 +268,16 @@ def main():
     start_date = date.fromisoformat(env("START_DATE", required=True))
 
     sp = get_client()
-    print(f"[INFO] Authentification Client Spotify : OK")
-    me = sp.me();
-    print(f"[INFO] Utilisateur Spotify : {me.get('display_name')}")
-    market = me.get("country");
-    print(f"[INFO] Pays Utilisateur Spotify : {market}")
+    log.info("Authentification Spotify : OK")
+    me = sp.me()
+    log.info("Utilisateur Spotify : %s", me.get("display_name"))
+    market = me.get("country")
+    log.info("Pays de l'utilisateur : %s", market)
     playlist_id = find_or_create_playlist(sp, me)
-    print(f"[INFO] Playlist cible : {playlist_id}")
+    log.info("Playlist cible : %s", playlist_id)
 
     existing = get_playlist_track_ids(sp, playlist_id)
-    print(f"[INFO] {len(existing)} titre(s) déjà dans la playlist.")
+    log.info("%d titre(s) déjà dans la playlist.", len(existing))
 
     # Fenêtre de scan : on repart du LENDEMAIN du dernier scan (pour ne pas
     # reproposer un titre déjà traité), sans jamais descendre sous START_DATE.
@@ -268,15 +286,14 @@ def main():
     last_scan = load_last_scan()
     if last_scan:
         floor = max(start_date, last_scan + timedelta(days=1))
-        print(f"[INFO] Dernier scan : {last_scan.isoformat()} → "
-              f"sorties à partir de {floor.isoformat()}.")
+        log.info("Dernier scan : %s → sorties à partir de %s.",
+                 last_scan.isoformat(), floor.isoformat())
     else:
         floor = start_date
-        print(f"[INFO] Aucun scan précédent → depuis START_DATE "
-              f"({floor.isoformat()}).")
+        log.info("Aucun scan précédent → depuis START_DATE (%s).", floor.isoformat())
 
     artists = get_followed_artists(sp)
-    print(f"[INFO] {len(artists)} artiste(s) suivi(s).")
+    log.info("%d artiste(s) suivi(s).", len(artists))
 
     seen = set(existing)
     new_tracks = []  # (release_date, uri)
@@ -290,8 +307,8 @@ def main():
                     new_tracks.append((_rd, uri))
                     added_here += 1
         if albums:
-            print(f"  [{i}/{len(artists)}] {artist['name']} — "
-                  f"{len(albums)} sortie(s), {added_here} nouveau(x) titre(s)")
+            log.info("[%d/%d] %s — %d sortie(s), %d nouveau(x) titre(s)",
+                     i, len(artists), artist["name"], len(albums), added_here)
 
     # Ordre chronologique : les plus anciennes nouveautés en premier.
     new_tracks.sort(key=lambda x: x[0])
@@ -300,18 +317,24 @@ def main():
     if uris:
         for batch in chunked(uris, 100):
             sp.playlist_add_items(playlist_id, batch)
-        print(f"[OK] {len(uris)} titre(s) ajouté(s) à la playlist.")
+        log.info("%d titre(s) ajouté(s) à la playlist.", len(uris))
     else:
-        print("[OK] Aucune nouveauté à ajouter.")
+        log.info("Aucune nouveauté à ajouter.")
 
     # On enregistre la date de ce scan APRÈS succès, pour repartir de là au
     # prochain passage (même si la playlist est vidée entre-temps).
     today = date.today()
     save_last_scan(today)
-    print(f"[INFO] Date du dernier scan enregistrée : {today.isoformat()}")
+    log.info("Date du dernier scan enregistrée : %s", today.isoformat())
 
     notify_discord(discord_webhook, len(uris), len(artists), floor, today)
 
 
 if __name__ == "__main__":
-    main()
+    setup_logging()
+    try:
+        main()
+    except Exception as exc:  # noqa: BLE001 — on veut journaliser/notifier toute erreur
+        log.exception("Échec du sync")
+        notify_discord(env("DISCORD_WEBHOOK_URL"), error=f"{type(exc).__name__}: {exc}")
+        sys.exit(1)
