@@ -89,6 +89,7 @@ Deux options selon ton infrastructure :
      - `SPOTIFY_CLIENT_ID`
      - `SPOTIFY_CLIENT_SECRET`
      - `SPOTIFY_REFRESH_TOKEN`
+     - `DISCORD_WEBHOOK_URL` *(optionnel)* — URL du webhook Discord pour recevoir un résumé après chaque sync
    - Onglet **Variables** → *New repository variable* :
      - `START_DATE` → ex. `2026-01-01`
      - `SPOTIFY_PLAYLIST_NAME` → ex. `Nouveautés abonnements`
@@ -108,6 +109,7 @@ L'image est publiée automatiquement sur GitHub Container Registry à chaque pus
    SPOTIFY_REFRESH_TOKEN=xxx
    START_DATE=2026-01-01
    SPOTIFY_PLAYLIST_ID=xxx
+   DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...  # optionnel
    ```
 
 2. Crée un répertoire persistant pour `state.json` :
@@ -150,6 +152,7 @@ L'image est publiée automatiquement sur GitHub Container Registry à chaque pus
 | `START_DATE`            | var     | Date plancher absolue (`AAAA-MM-JJ`) : point de départ du 1er scan, jamais dépassée vers le bas |
 | `SPOTIFY_PLAYLIST_NAME` | var     | Nom de la playlist (créée si absente)                           |
 | `SPOTIFY_PLAYLIST_ID`   | var     | *(optionnel)* ID d'une playlist existante, prioritaire sur le nom |
+| `DISCORD_WEBHOOK_URL`   | secret  | *(optionnel)* URL d'un webhook Discord — envoie un résumé après chaque sync |
 
 ---
 
@@ -164,6 +167,11 @@ L'image est publiée automatiquement sur GitHub Container Registry à chaque pus
   automatiquement par le workflow GitHub Actions (commit quotidien) ou persisté
   dans le volume Docker. Pour **forcer un re-scan complet** depuis `START_DATE`,
   supprime simplement `state.json`.
+- **Notifications Discord.** Si `DISCORD_WEBHOOK_URL` est défini, un message est
+  envoyé dans le salon Discord ciblé à la fin de chaque sync, avec le nombre de
+  titres ajoutés, la fenêtre de scan et le nombre d'artistes analysés. En cas
+  d'échec de la notification, le sync n'est pas interrompu (avertissement dans
+  les logs uniquement). Pour créer un webhook : **Paramètres du salon → Intégrations → Webhooks → Nouveau webhook**.
 - ⚠️ **Droits du workflow.** Le workflow committe `state.json` ; il déclare déjà
   `permissions: contents: write`. Si le `git push` échoue, va dans
   **Settings → Actions → General → Workflow permissions** et coche

@@ -22,6 +22,8 @@ from __future__ import annotations
 import json
 import os
 import sys
+import urllib.error
+import urllib.request
 from datetime import date, timedelta
 
 import spotipy
@@ -208,7 +210,43 @@ def chunked(seq, n):
         yield seq[i : i + n]
 
 
+def notify_discord(webhook_url, added, artists_count, floor, today, error=None):
+    """Envoie un résumé du sync sur un webhook Discord."""
+    if not webhook_url:
+        return
+    if error:
+        color = 0xED4245  # rouge Discord
+        title = "spotinew — sync échoué"
+        description = f"Une erreur s'est produite :\n```\n{error}\n```"
+    else:
+        color = 0x1DB954  # vert Spotify
+        title = "spotinew — sync terminé"
+        description = (
+            f"**{added}** nouveau(x) titre(s) ajouté(s)\n"
+            f"Fenêtre : {floor.isoformat()} → {today.isoformat()}\n"
+            f"Artistes scannés : {artists_count}"
+        )
+    payload = json.dumps({
+        "embeds": [{
+            "title": title,
+            "description": description,
+            "color": color,
+        }]
+    }).encode()
+    req = urllib.request.Request(
+        webhook_url,
+        data=payload,
+        headers={"Content-Type": "application/json", "User-Agent": "spotinew/1.0"},
+        method="POST",
+    )
+    try:
+        urllib.request.urlopen(req, timeout=10)
+    except urllib.error.URLError as exc:
+        print(f"[WARN] Impossible d'envoyer la notification Discord : {exc}")
+
+
 def main():
+    discord_webhook = env("DISCORD_WEBHOOK_URL")
     start_date = date.fromisoformat(env("START_DATE", required=True))
 
     sp = get_client()
@@ -268,6 +306,8 @@ def main():
     today = date.today()
     save_last_scan(today)
     print(f"[INFO] Date du dernier scan enregistrée : {today.isoformat()}")
+
+    notify_discord(discord_webhook, len(uris), len(artists), floor, today)
 
 
 if __name__ == "__main__":
