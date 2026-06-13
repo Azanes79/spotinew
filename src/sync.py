@@ -236,7 +236,7 @@ def notify_discord(webhook_url, added, artists_count, floor, today, error=None):
     req = urllib.request.Request(
         webhook_url,
         data=payload,
-        headers={"Content-Type": "application/json"},
+        headers={"Content-Type": "application/json", "User-Agent": "spotinew/1.0"},
         method="POST",
     )
     try:
