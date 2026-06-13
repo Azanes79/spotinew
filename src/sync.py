@@ -41,6 +41,21 @@ SCOPES = "user-follow-read playlist-read-private playlist-modify-private playlis
 
 log = logging.getLogger("spotinew")
 
+# Couleurs ANSI pour les logs (rendues par GitHub Actions et `docker logs`).
+# Désactivables en définissant la variable NO_COLOR (https://no-color.org).
+_USE_COLOR = os.environ.get("NO_COLOR") is None
+GREEN = "\033[32m"
+RED = "\033[31m"
+RESET = "\033[0m"
+
+
+def green(text):
+    """Entoure `text` de codes couleur verts (sauf si NO_COLOR est défini)."""
+    return f"{GREEN}{text}{RESET}" if _USE_COLOR else text
+def red(text):
+    """Entoure `text` de codes couleur verts (sauf si NO_COLOR est défini)."""
+    return f"{RED}{text}{RESET}" if _USE_COLOR else text
+
 
 def env(name, default=None, required=False):
     # Une variable GitHub Actions non définie est transmise comme chaîne vide :
@@ -307,8 +322,10 @@ def main():
                     new_tracks.append((_rd, uri))
                     added_here += 1
         if albums:
-            log.info("[%d/%d] %s — %d sortie(s), %d nouveau(x) titre(s)",
+            log.info(green("[%d/%d] %s — %d sortie(s), %d nouveau(x) titre(s)"),
                      i, len(artists), artist["name"], len(albums), added_here)
+        if added_here == 0:
+            log.info(red("[%d/%d] %s — aucune sortie"), i, len(artists), artist["name"])
 
     # Ordre chronologique : les plus anciennes nouveautés en premier.
     new_tracks.sort(key=lambda x: x[0])
