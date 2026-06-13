@@ -122,14 +122,14 @@ L'image est publiée automatiquement sur GitHub Container Registry à chaque pus
    docker run --rm \
      --env-file /etc/spotinew.env \
      -v /var/lib/spotinew:/data \
-     ghcr.io/floriantranier/spotinew:latest
+     ghcr.io/YOUR_GITHUB_USERNAME/spotinew:latest
    ```
 
    **Avec Docker Compose (`docker compose run spotinew`) :**
    ```yaml
    services:
      spotinew:
-       image: ghcr.io/floriantranier/spotinew:latest
+       image: ghcr.io/YOUR_GITHUB_USERNAME/spotinew:latest
        env_file: /etc/spotinew.env
        volumes:
          - /var/lib/spotinew:/data
