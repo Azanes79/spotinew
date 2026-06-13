@@ -20,7 +20,7 @@ try:
 except ImportError:
     pass
 
-SCOPES = "user-follow-read playlist-modify-private playlist-modify-public"
+SCOPES = "user-follow-read playlist-read-private playlist-modify-private playlist-modify-public"
 
 
 def main():

@@ -36,7 +36,7 @@ try:
 except ImportError:  # python-dotenv est optionnel (absent en CI, vars déjà injectées)
     pass
 
-SCOPES = "user-follow-read playlist-modify-private playlist-modify-public"
+SCOPES = "user-follow-read playlist-read-private playlist-modify-private playlist-modify-public"
 
 
 def env(name, default=None, required=False):
