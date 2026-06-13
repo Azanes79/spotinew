@@ -250,8 +250,11 @@ def main():
     start_date = date.fromisoformat(env("START_DATE", required=True))
 
     sp = get_client()
-    me = sp.me()
-    market = me.get("country")
+    print(f"[INFO] Authentification Client Spotify : OK")
+    me = sp.me();
+    print(f"[INFO] Utilisateur Spotify : {me.get('display_name')}")
+    market = me.get("country");
+    print(f"[INFO] Pays Utilisateur Spotify : {market}")
     playlist_id = find_or_create_playlist(sp, me)
     print(f"[INFO] Playlist cible : {playlist_id}")
 
