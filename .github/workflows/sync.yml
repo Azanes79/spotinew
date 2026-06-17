@@ -2,10 +2,10 @@ name: spotinew — sync playlist
 
 on:
   schedule:
-    # Tous les jours à 02:00 UTC = 04:00 à Paris en été (CEST), 03:00 en hiver (CET).
+    # Tous les jours à 02:12 UTC = 04:12 à Paris en été (CEST), 03:12 en hiver (CET).
     # Décalé de 2 h pour laisser le temps aux sorties du jour d'apparaître dans
     # le catalogue Spotify avant le scan.
-    - cron: "0 2 * * *"
+    - cron: "12 2 * * *"
   workflow_dispatch: {} # permet aussi de lancer manuellement depuis l'onglet Actions
 
 # Nécessaire pour que le workflow puisse committer state.json (date du dernier scan).
